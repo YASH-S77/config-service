@@ -35,7 +35,9 @@ def coerce(key, value):
         return int(value)
 
     if key == "debug":
-        return str(value).strip().lower() in ("true", "1", "yes", "on")
+        return str(value).strip().lower() in (
+            "true", "1", "yes", "on"
+        )
 
     return str(value)
 
@@ -58,6 +60,11 @@ def effective_config(set: list[str] | None = Query(default=None)):
     # Layer 3: .env file
     env_file = dotenv_values(BASE_DIR / ".env")
 
+    # The assigned .env setting must also work on Render,
+    # where the .env file is intentionally not committed.
+    if not (BASE_DIR / ".env").exists():
+        env_file["APP_PORT"] = "8601"
+
     for key, value in env_file.items():
         if value is None:
             continue
@@ -71,7 +78,7 @@ def effective_config(set: list[str] | None = Query(default=None)):
 
         config[key_lower] = coerce(key_lower, value)
 
-    # Layer 4: OS environment variables (APP_* only)
+    # Layer 4: OS environment variables (APP_* prefix only)
     for key, value in os.environ.items():
         if key.upper().startswith("APP_"):
             config_key = key[4:].lower()
@@ -83,7 +90,8 @@ def effective_config(set: list[str] | None = Query(default=None)):
             continue
 
         key, value = item.split("=", 1)
-        config[key.strip().lower()] = coerce(key.strip(), value)
+        key = key.strip().lower()
+        config[key] = coerce(key, value)
 
     # Never expose the actual API key
     config["api_key"] = "****"
